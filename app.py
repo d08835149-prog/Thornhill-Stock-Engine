@@ -17,6 +17,13 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# ── Language Toggle ───────────────────────────────────────────
+lang = st.radio("🌐 Language / Langue", ["English", "Français"], horizontal=True, label_visibility="collapsed")
+FR = lang == "Français"
+
+def t(en, fr):
+    return fr if FR else en
+
 # ── Title ─────────────────────────────────────────────────────
 st.title("📈 Thornhill Quant League Engine")
 
@@ -24,9 +31,9 @@ st.title("📈 Thornhill Quant League Engine")
 # Sidebar: Period + Ticker + Quantity Input
 # ════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header(t("⚙️ Settings", "⚙️ Paramètres"))
 
-    period_map = {
+    period_map_en = {
         "1 Day":    "1d",
         "3 Days":   "5d",
         "1 Week":   "1wk",
@@ -37,23 +44,37 @@ with st.sidebar:
         "2 Years":  "2y",
         "5 Years":  "5y",
     }
-    period_label = st.selectbox("📅 Select Period", list(period_map.keys()), index=6)
+    period_map_fr = {
+        "1 jour":   "1d",
+        "3 jours":  "5d",
+        "1 semaine":"1wk",
+        "1 mois":   "1mo",
+        "3 mois":   "3mo",
+        "6 mois":   "6mo",
+        "1 an":     "1y",
+        "2 ans":    "2y",
+        "5 ans":    "5y",
+    }
+    period_map = period_map_fr if FR else period_map_en
+    period_label = st.selectbox(t("📅 Select Period", "📅 Sélectionner la période"), list(period_map.keys()), index=6)
     period = period_map[period_label]
 
     st.divider()
-    st.subheader("🏢 Enter Tickers (up to 10)")
-    st.caption("Enter tickers and quantity, then click Analyze.")
+    st.subheader(t("🏢 Enter Tickers (up to 10)", "🏢 Entrer les titres (jusqu'à 10)"))
+    st.caption(t("Enter tickers and quantity, then click Analyze.", "Entrez les titres et la quantité, puis cliquez sur Analyser."))
 
     ticker_qty_list = []
     for i in range(10):
         col_t, col_q = st.columns([2, 1])
-        t = col_t.text_input(f"Ticker {i+1}", key=f"ticker_{i}", placeholder="AAPL")
-        q = col_q.number_input("Qty", min_value=1, value=1, key=f"qty_{i}", label_visibility="visible")
-        if t.strip():
-            ticker_qty_list.append({"ticker": t.strip().upper(), "qty": int(q)})
+        t_label = t(f"Ticker {i+1}", f"Titre {i+1}")
+        q_label = t("Qty", "Qté")
+        tk_val = col_t.text_input(t_label, key=f"ticker_{i}", placeholder="AAPL")
+        q_val  = col_q.number_input(q_label, min_value=1, value=1, key=f"qty_{i}", label_visibility="visible")
+        if tk_val.strip():
+            ticker_qty_list.append({"ticker": tk_val.strip().upper(), "qty": int(q_val)})
 
     st.divider()
-    analyze = st.button("🔍 Analyze", use_container_width=True)
+    analyze = st.button(t("🔍 Analyze", "🔍 Analyser"), use_container_width=True)
 
 # ════════════════════════════════════════════════════════════
 # Analysis
@@ -67,7 +88,7 @@ if analyze and ticker_qty_list:
     all_close   = {}
     ticker_data = {}
 
-    with st.spinner("Loading data..."):
+    with st.spinner(t("Loading data...", "Chargement des données...")):
         for tk in tickers_input:
             obj  = yf.Ticker(tk)
             hist = obj.history(period=period)
@@ -75,10 +96,10 @@ if analyze and ticker_qty_list:
                 all_close[tk]   = hist["Close"]
                 ticker_data[tk] = {"hist": hist, "info": obj.info}
             else:
-                st.warning(f"⚠️ Could not find data for {tk}.")
+                st.warning(t(f"⚠️ Could not find data for {tk}.", f"⚠️ Données introuvables pour {tk}."))
 
     if not all_close:
-        st.error("No valid ticker data found.")
+        st.error(t("No valid ticker data found.", "Aucune donnée valide trouvée."))
         st.stop()
 
     # ── Save to Supabase ──────────────────────────────────
@@ -92,12 +113,12 @@ if analyze and ticker_qty_list:
                 "quantity": qty_map[tk],
                 "price":    current_price,
             }).execute()
-        st.toast("✅ Saved to Supabase!", icon="💾")
+        st.toast(t("✅ Saved to Supabase!", "✅ Sauvegardé dans Supabase!"), icon="💾")
     except Exception as e:
-        st.warning(f"Save failed: {e}")
+        st.warning(t(f"Save failed: {e}", f"Échec de la sauvegarde: {e}"))
 
     # ── 1. Portfolio Summary Table ────────────────────────
-    st.subheader("📋 Portfolio Summary")
+    st.subheader(t("📋 Portfolio Summary", "📋 Résumé du portefeuille"))
 
     summary_rows = []
     for tk in tickers_input:
@@ -113,29 +134,21 @@ if analyze and ticker_qty_list:
         profit        = (current_price - start_price) * qty
 
         summary_rows.append({
-            "Ticker":                          tk,
-            "Qty":                             qty,
-            f"Start Price ({period_label})":   f"${start_price:.2f}",
-            "Current Price":                   f"${current_price:.2f}",
-            "Return":                          f"{ret_pct:+.2f}%",
-            "Market Value":                    f"${hold_value:,.2f}",
-            "P&L":                             f"${profit:+,.2f}",
+            t("Ticker", "Titre"):                                      tk,
+            t("Qty", "Qté"):                                           qty,
+            t(f"Start Price ({period_label})", f"Prix initial ({period_label})"): f"${start_price:.2f}",
+            t("Current Price", "Prix actuel"):                         f"${current_price:.2f}",
+            t("Return", "Rendement"):                                  f"{ret_pct:+.2f}%",
+            t("Market Value", "Valeur marchande"):                     f"${hold_value:,.2f}",
+            "P&L":                                                     f"${profit:+,.2f}",
         })
 
     summary_df = pd.DataFrame(summary_rows)
-    st.dataframe(
-        summary_df,
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "Return": st.column_config.TextColumn("Return"),
-            "P&L":    st.column_config.TextColumn("P&L"),
-        },
-    )
+    st.dataframe(summary_df, hide_index=True, use_container_width=True)
 
     # ── 2. Combined Price Chart ───────────────────────────
     st.divider()
-    st.subheader("📊 Combined Close Price Chart")
+    st.subheader(t("📊 Combined Close Price Chart", "📊 Graphique comparatif des prix"))
     fig_combined = go.Figure()
     for tk, close_series in all_close.items():
         fig_combined.add_trace(go.Scatter(
@@ -149,8 +162,8 @@ if analyze and ticker_qty_list:
         height=420,
         margin=dict(l=0, r=0, t=30, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis_title="Date",
-        yaxis_title="Close Price (USD)",
+        xaxis_title=t("Date", "Date"),
+        yaxis_title=t("Close Price (USD)", "Prix de clôture (USD)"),
         hovermode="x unified",
     )
     st.plotly_chart(fig_combined, use_container_width=True, config={"displayModeBar": False})
@@ -189,19 +202,19 @@ if analyze and ticker_qty_list:
         ret_pct     = (current_price - start_price) / start_price * 100
         ret_str     = f"{ret_pct:+.2f}%"
 
-        with st.expander(f"📌 {tk}  |  Current Price ${current_price:.2f}  |  Return {ret_str}", expanded=True):
+        with st.expander(f"📌 {tk}  |  {t('Current Price', 'Prix actuel')} ${current_price:.2f}  |  {t('Return', 'Rendement')} {ret_str}", expanded=True):
 
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Current Price", f"${current_price:.2f}" if isinstance(current_price, float) else current_price, delta=ret_str)
-            col2.metric("Prev Close",    f"${prev_close:.2f}"    if isinstance(prev_close, float)    else prev_close)
-            col3.metric("Market Cap",    mkt_cap_str)
-            col4.metric("Bid / Ask",     f"${bid} / ${ask}"      if bid != "N/A"                    else "N/A")
+            col1.metric(t("Current Price", "Prix actuel"),  f"${current_price:.2f}" if isinstance(current_price, float) else current_price, delta=ret_str)
+            col2.metric(t("Prev Close", "Clôture préc."),   f"${prev_close:.2f}"    if isinstance(prev_close, float)    else prev_close)
+            col3.metric(t("Market Cap", "Capitalisation"),  mkt_cap_str)
+            col4.metric("Bid / Ask",                        f"${bid} / ${ask}"      if bid != "N/A"                    else "N/A")
 
             col5, col6, col7, col8 = st.columns(4)
-            col5.metric("Open",  f"${open_price:.2f}" if isinstance(open_price, float) else open_price)
-            col6.metric("Close", f"${close.iloc[-1]:.2f}")
-            col7.metric("High",  f"${day_high:.2f}"   if isinstance(day_high, float)   else day_high)
-            col8.metric("Low",   f"${day_low:.2f}"    if isinstance(day_low, float)    else day_low)
+            col5.metric(t("Open", "Ouverture"), f"${open_price:.2f}" if isinstance(open_price, float) else open_price)
+            col6.metric(t("Close", "Clôture"),  f"${close.iloc[-1]:.2f}")
+            col7.metric(t("High", "Haut"),      f"${day_high:.2f}"   if isinstance(day_high, float)   else day_high)
+            col8.metric(t("Low", "Bas"),        f"${day_low:.2f}"    if isinstance(day_low, float)    else day_low)
 
             # Candlestick + Indicators Chart
             fig = make_subplots(
@@ -209,7 +222,10 @@ if analyze and ticker_qty_list:
                 shared_xaxes=True,
                 row_heights=[0.75, 0.25],
                 vertical_spacing=0.03,
-                subplot_titles=(f"{tk} Candlestick + Indicators", "Volume"),
+                subplot_titles=(
+                    t(f"{tk} Candlestick + Indicators", f"{tk} Chandeliers + Indicateurs"),
+                    t("Volume", "Volume"),
+                ),
             )
 
             fig.add_trace(go.Candlestick(
@@ -241,7 +257,7 @@ if analyze and ticker_qty_list:
                       for c, o in zip(hist["Close"], hist["Open"])]
             fig.add_trace(go.Bar(
                 x=hist.index, y=hist["Volume"],
-                marker_color=colors, name="Volume", showlegend=False,
+                marker_color=colors, name=t("Volume", "Volume"), showlegend=False,
             ), row=2, col=1)
 
             fig.update_layout(
@@ -253,7 +269,7 @@ if analyze and ticker_qty_list:
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
             # ── News Section ──────────────────────────────
-            st.subheader(f"📰 Latest News — {tk}")
+            st.subheader(t(f"📰 Latest News — {tk}", f"📰 Dernières nouvelles — {tk}"))
             finnhub_key = st.secrets.get("FINNHUB_API_KEY", "")
             if finnhub_key:
                 try:
@@ -271,21 +287,23 @@ if analyze and ticker_qty_list:
                             filtered = news[:5]
                         if filtered:
                             for item in filtered:
-                                headline = item.get("headline", "No Title")
+                                headline = item.get("headline", t("No Title", "Sans titre"))
                                 news_url = item.get("url", "#")
                                 source   = item.get("source", "")
                                 dt       = datetime.fromtimestamp(item.get("datetime", 0)).strftime("%Y-%m-%d") if item.get("datetime") else ""
                                 st.markdown(f"- **[{headline}]({news_url})** `{source}` {dt}")
                         else:
-                            st.caption("No news found in the last 7 days.")
+                            st.caption(t("No news found in the last 7 days.", "Aucune nouvelle trouvée dans les 7 derniers jours."))
                     else:
-                        st.caption("Could not load news.")
+                        st.caption(t("Could not load news.", "Impossible de charger les nouvelles."))
                 except Exception as e:
-                    st.caption(f"News error: {e}")
+                    st.caption(t(f"News error: {e}", f"Erreur de nouvelles: {e}"))
             else:
-                st.caption("🔑 Add `FINNHUB_API_KEY` to Streamlit secrets to enable news.")
+                st.caption(t("🔑 Add `FINNHUB_API_KEY` to Streamlit secrets to enable news.",
+                             "🔑 Ajoutez `FINNHUB_API_KEY` aux secrets Streamlit pour activer les nouvelles."))
 
 elif analyze and not ticker_qty_list:
-    st.warning("Please enter at least one ticker.")
+    st.warning(t("Please enter at least one ticker.", "Veuillez entrer au moins un titre."))
 else:
-    st.info("👈 Enter a period and tickers on the left sidebar, then click **Analyze**.")
+    st.info(t("👈 Enter a period and tickers on the left sidebar, then click **Analyze**.",
+              "👈 Entrez une période et des titres dans la barre latérale, puis cliquez sur **Analyser**."))
