@@ -118,9 +118,12 @@ if "logged_in" not in st.session_state:
     st.session_state.nickname   = ""
     st.session_state.load_tickers = []
 
-def hash_pw(pw):
-    import hashlib
-    return hashlib.sha256(pw.encode()).hexdigest()
+if "show_admin" not in st.session_state:
+    st.session_state.show_admin       = False
+    st.session_state.admin_verified   = False
+
+ADMIN_NICKNAME = st.secrets.get("ADMIN_NICKNAME", "Ditto")
+ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "")
 
 def do_login(nickname, password):
     res = supabase.table("users").select("*").eq("nickname", nickname).execute()
@@ -188,10 +191,34 @@ with st.sidebar:
         col_w, col_l = st.columns([3, 1])
         col_w.markdown(f"👤 **{st.session_state.nickname}**")
         if col_l.button(t("logout_btn")):
-            st.session_state.logged_in    = False
-            st.session_state.nickname     = ""
-            st.session_state.load_tickers = []
+            st.session_state.logged_in      = False
+            st.session_state.nickname       = ""
+            st.session_state.load_tickers   = []
+            st.session_state.show_admin     = False
+            st.session_state.admin_verified = False
             st.rerun()
+
+        # ── Admin Button (Ditto only) ─────────────────────
+        if st.session_state.nickname == ADMIN_NICKNAME:
+            st.divider()
+            if not st.session_state.admin_verified:
+                st.caption("🛡️ Admin Access")
+                admin_pw_input = st.text_input("Admin Password", type="password", key="admin_pw_input")
+                if st.button(t("admin_page"), use_container_width=True, type="primary"):
+                    if hash_pw(admin_pw_input) == hash_pw(ADMIN_PASSWORD):
+                        st.session_state.admin_verified = True
+                        st.session_state.show_admin     = True
+                        st.rerun()
+                    else:
+                        st.error(t("wrong_pw"))
+            else:
+                if st.button(t("admin_page"), use_container_width=True, type="primary"):
+                    st.session_state.show_admin = not st.session_state.show_admin
+                    st.rerun()
+                if st.button("🔒 Lock Admin", use_container_width=True):
+                    st.session_state.admin_verified = False
+                    st.session_state.show_admin     = False
+                    st.rerun()
 
         # ── Change Password ───────────────────────────────
         with st.expander(t("change_pw")):
@@ -524,7 +551,7 @@ else:
 # ════════════════════════════════════════════════════════════
 # Admin Panel (Ditto only)
 # ════════════════════════════════════════════════════════════
-if st.session_state.logged_in and st.session_state.nickname == ADMIN_NICKNAME:
+if st.session_state.logged_in and st.session_state.nickname == ADMIN_NICKNAME and st.session_state.show_admin:
     st.divider()
     st.header(t("admin_page"))
 
