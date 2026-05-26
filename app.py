@@ -101,7 +101,7 @@ with st.sidebar:
 
     ticker_qty_list = []
     for i in range(10):
-        col_t, col_e, col_q = st.columns([2, 1.2, 0.8])
+        col_t, col_e, col_q = st.columns([3, 2, 1])
         tk_val  = col_t.text_input(f"{t('ticker')} {i+1}", key=f"ticker_{i}", placeholder="AAPL")
         ex_val  = col_e.selectbox("Exchange", list(EXCHANGE_SUFFIX.keys()), key=f"exchange_{i}", label_visibility="collapsed")
         q_val   = col_q.number_input(t("qty"), min_value=1, value=1, key=f"qty_{i}", label_visibility="collapsed")
