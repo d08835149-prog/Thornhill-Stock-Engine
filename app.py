@@ -125,6 +125,11 @@ if "show_admin" not in st.session_state:
 ADMIN_NICKNAME = st.secrets.get("ADMIN_NICKNAME", "Ditto")
 ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "")
 
+import hashlib
+
+def hash_pw(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
+
 def do_login(nickname, password):
     res = supabase.table("users").select("*").eq("nickname", nickname).execute()
     if not res.data:
@@ -151,8 +156,6 @@ def do_change_pw(nickname, current_pw, new_pw):
         return "wrong_pw"
     supabase.table("users").update({"password": hash_pw(new_pw)}).eq("nickname", nickname).execute()
     return "ok"
-
-ADMIN_NICKNAME = "Ditto"
 
 # ── Title ─────────────────────────────────────────────────────
 st.title("📈 Thornhill Stock League Engine")
