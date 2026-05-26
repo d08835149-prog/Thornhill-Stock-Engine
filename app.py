@@ -158,7 +158,7 @@ def do_change_pw(nickname, current_pw, new_pw):
     return "ok"
 
 # ── Title ─────────────────────────────────────────────────────
-st.title("📈 Thornhill Stock League Engine")
+st.title("📈 Thornhill Stock Engine")
 
 # ════════════════════════════════════════════════════════════
 # Sidebar: Period + Ticker + Quantity Input
