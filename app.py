@@ -197,6 +197,7 @@ with st.sidebar:
             st.caption(f"Error: {e}")
 
     st.divider()
+    period_map   = PERIODS[lang]
     period_label = st.selectbox(t("select_period"), list(period_map.keys()), index=6)
     period       = period_map[period_label]
 
