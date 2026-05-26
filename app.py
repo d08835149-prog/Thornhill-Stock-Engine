@@ -10,6 +10,12 @@ from datetime import datetime, timedelta
 # ── Page Config ──────────────────────────────────────────────
 st.set_page_config(page_title="Thornhill Stock League", layout="wide")
 
+st.markdown("""
+<style>
+[data-testid="stSidebar"] { min-width: 420px; max-width: 420px; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── Supabase Connection ───────────────────────────────────────
 @st.cache_resource
 def init_supabase():
@@ -101,7 +107,7 @@ with st.sidebar:
 
     ticker_qty_list = []
     for i in range(10):
-        col_t, col_e, col_q = st.columns([3, 2, 1])
+        col_t, col_e, col_q = st.columns([2, 2, 1])
         tk_val  = col_t.text_input(f"{t('ticker')} {i+1}", key=f"ticker_{i}", placeholder="AAPL", label_visibility="visible")
         ex_val  = col_e.selectbox("🌍 Exchange", list(EXCHANGE_SUFFIX.keys()), key=f"exchange_{i}", label_visibility="visible")
         q_val   = col_q.number_input(t("qty"), min_value=1, value=1, key=f"qty_{i}", label_visibility="visible")
