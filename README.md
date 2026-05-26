@@ -132,3 +132,12 @@ Add all secrets under **App Settings → Secrets** in the Streamlit Cloud dashbo
 ---
 
 ## 🍁 Made for Thornhill Stock League — Canada
+
+---
+
+## 👨‍💻 Credits
+
+| Role | Name |
+|---|---|
+| Developer | Ditto A. |
+| AI Assistant | Claude (Anthropic) |
