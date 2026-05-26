@@ -122,6 +122,17 @@ with st.sidebar:
     analyze = st.button(t("analyze"), use_container_width=True)
 
 # ════════════════════════════════════════════════════════════
+# Cached Data Fetcher (10 min TTL)
+# ════════════════════════════════════════════════════════════
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_ticker_data(ticker: str, period: str):
+    obj  = yf.Ticker(ticker)
+    hist = obj.history(period=period)
+    if hist.empty:
+        return None, None
+    return hist, obj.info
+
+# ════════════════════════════════════════════════════════════
 # Analysis
 # ════════════════════════════════════════════════════════════
 if analyze and ticker_qty_list:
@@ -135,11 +146,10 @@ if analyze and ticker_qty_list:
 
     with st.spinner(t("loading")):
         for tk in tickers_input:
-            obj  = yf.Ticker(tk)
-            hist = obj.history(period=period)
-            if not hist.empty:
+            hist, info = fetch_ticker_data(tk, period)
+            if hist is not None:
                 all_close[tk]   = hist["Close"]
-                ticker_data[tk] = {"hist": hist, "info": obj.info}
+                ticker_data[tk] = {"hist": hist, "info": info}
             else:
                 st.warning(f"⚠️ {t('no_data')} {tk}.")
 
