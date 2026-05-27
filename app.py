@@ -6,6 +6,14 @@ from plotly.subplots import make_subplots
 from supabase import create_client
 import requests
 from datetime import datetime, timedelta
+import io
+import hashlib
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_CENTER
 
 # ── Page Config ──────────────────────────────────────────────
 st.set_page_config(page_title="Thornhill Stock League", layout="wide")
@@ -112,6 +120,102 @@ PERIODS = {
     "한국어":  {"1일":"1d","3일":"5d","1주일":"1wk","2주일":"2wk","1개월":"1mo","3개월":"3mo","6개월":"6mo","1년":"1y","2년":"2y","5년":"5y"},
 }
 
+def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, session_name):
+    buffer = io.BytesIO()
+    doc    = SimpleDocTemplate(buffer, pagesize=letter,
+                               rightMargin=0.75*inch, leftMargin=0.75*inch,
+                               topMargin=0.75*inch,  bottomMargin=0.75*inch)
+    styles = getSampleStyleSheet()
+    story  = []
+
+    title_style = ParagraphStyle("title", fontSize=20, fontName="Helvetica-Bold",
+                                 alignment=TA_CENTER, spaceAfter=4)
+    sub_style   = ParagraphStyle("sub",   fontSize=9,  fontName="Helvetica",
+                                 alignment=TA_CENTER, spaceAfter=8, textColor=colors.grey)
+
+    story.append(Paragraph("Thornhill Stock League Engine", title_style))
+    story.append(Paragraph(session_name if session_name else "Analysis Report", sub_style))
+    story.append(Paragraph(
+        f"User: {nickname}  |  Period: {period_label}  |  {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        sub_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(Spacer(1, 12))
+
+    # Portfolio Summary
+    story.append(Paragraph("Portfolio Summary", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+    if summary_rows:
+        headers = list(summary_rows[0].keys())
+        data    = [headers] + [[str(row[h]) for h in headers] for row in summary_rows]
+        tbl     = Table(data, repeatRows=1, hAlign="LEFT")
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,0),  colors.HexColor("#1a1a2e")),
+            ("TEXTCOLOR",     (0,0), (-1,0),  colors.white),
+            ("FONTNAME",      (0,0), (-1,0),  "Helvetica-Bold"),
+            ("FONTSIZE",      (0,0), (-1,-1), 8),
+            ("ROWBACKGROUNDS",(0,1), (-1,-1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",          (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ("PADDING",       (0,0), (-1,-1), 5),
+        ]))
+        story.append(tbl)
+
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("Individual Stock Details", styles["Heading2"]))
+
+    def fmt(v): return f"${v:.2f}" if isinstance(v, (int, float)) else str(v)
+
+    for tk, td in ticker_data.items():
+        info  = td["info"]
+        close = td["hist"]["Close"]
+        ma20  = close.rolling(20).mean()
+        ma50  = close.rolling(50).mean()
+        std20 = close.rolling(20).std()
+        bb_u  = (ma20 + 2 * std20).iloc[-1]
+        bb_l  = (ma20 - 2 * std20).iloc[-1]
+
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"▶  {tk}", ParagraphStyle("tkhead", fontSize=12,
+                     fontName="Helvetica-Bold", spaceAfter=5)))
+
+        price_data = [
+            ["Current Price", fmt(info.get("currentPrice") or close.iloc[-1]),
+             "Prev Close",    fmt(info.get("previousClose","N/A"))],
+            ["Open",          fmt(info.get("open","N/A")),
+             "Close",         fmt(close.iloc[-1])],
+            ["High",          fmt(info.get("dayHigh","N/A")),
+             "Low",           fmt(info.get("dayLow","N/A"))],
+            ["Bid",           fmt(info.get("bid","N/A")),
+             "Ask",           fmt(info.get("ask","N/A"))],
+            ["Market Cap",    f"${info.get('marketCap',0):,.0f}" if info.get("marketCap") else "N/A",
+             "",""],
+            ["MA20",          fmt(ma20.iloc[-1]) if not pd.isna(ma20.iloc[-1]) else "N/A",
+             "MA50",          fmt(ma50.iloc[-1]) if not pd.isna(ma50.iloc[-1]) else "N/A"],
+            ["BB Upper",      fmt(bb_u) if not pd.isna(bb_u) else "N/A",
+             "BB Lower",      fmt(bb_l) if not pd.isna(bb_l) else "N/A"],
+        ]
+        ptbl = Table(price_data, colWidths=[1.4*inch]*4)
+        ptbl.setStyle(TableStyle([
+            ("FONTNAME",      (0,0), (-1,-1), "Helvetica"),
+            ("FONTNAME",      (0,0), (0,-1),  "Helvetica-Bold"),
+            ("FONTNAME",      (2,0), (2,-1),  "Helvetica-Bold"),
+            ("FONTSIZE",      (0,0), (-1,-1), 8),
+            ("ROWBACKGROUNDS",(0,0), (-1,-1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",          (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ("PADDING",       (0,0), (-1,-1), 5),
+        ]))
+        story.append(ptbl)
+
+    story.append(Spacer(1, 20))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(Paragraph(
+        "Thornhill Stock League Engine  |  For analysis purposes only  |  Not financial advice",
+        ParagraphStyle("footer", fontSize=7, textColor=colors.grey, alignment=TA_CENTER)
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 # ── Session State Init ────────────────────────────────────────
 if "logged_in" not in st.session_state:
     st.session_state.logged_in  = False
@@ -124,8 +228,6 @@ if "show_admin" not in st.session_state:
 
 ADMIN_NICKNAME = st.secrets.get("ADMIN_NICKNAME", "Ditto")
 ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "")
-
-import hashlib
 
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -406,6 +508,21 @@ if analyze and ticker_qty_list:
 
     summary_df = pd.DataFrame(summary_rows)
     st.dataframe(summary_df, hide_index=True, use_container_width=True)
+
+    # ── PDF Download ──────────────────────────────────────
+    pdf_buffer = generate_pdf_report(
+        summary_rows, ticker_data, period_label,
+        st.session_state.nickname,
+        session_name if session_name.strip() else "Analysis Report"
+    )
+    filename = f"{session_name.strip() or 'report'}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    st.download_button(
+        label="📄 Download PDF Report",
+        data=pdf_buffer,
+        file_name=filename,
+        mime="application/pdf",
+        use_container_width=True,
+    )
 
     # ── 2. Combined Price Chart ───────────────────────────
     st.divider()
