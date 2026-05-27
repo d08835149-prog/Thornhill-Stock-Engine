@@ -12,7 +12,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
 from reportlab.lib.enums import TA_CENTER
 
 # ── Page Config ──────────────────────────────────────────────
@@ -120,7 +120,7 @@ PERIODS = {
     "한국어":  {"1일":"1d","3일":"5d","1주일":"1wk","2주일":"2wk","1개월":"1mo","3개월":"3mo","6개월":"6mo","1년":"1y","2년":"2y","5년":"5y"},
 }
 
-def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, session_name):
+def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, session_name, all_close):
     buffer = io.BytesIO()
     doc    = SimpleDocTemplate(buffer, pagesize=letter,
                                rightMargin=0.75*inch, leftMargin=0.75*inch,
@@ -159,6 +159,29 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
         ]))
         story.append(tbl)
 
+    # Combined Chart
+    story.append(Spacer(1, 16))
+    story.append(Paragraph("Combined Price Chart", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+    try:
+        fig_combined = go.Figure()
+        for tk, close_series in all_close.items():
+            fig_combined.add_trace(go.Scatter(
+                x=close_series.index, y=close_series.values,
+                mode="lines", name=tk, line=dict(width=2),
+            ))
+        fig_combined.update_layout(
+            height=300, width=650,
+            margin=dict(l=20, r=20, t=20, b=20),
+            paper_bgcolor="white", plot_bgcolor="white",
+            legend=dict(orientation="h"),
+        )
+        img_bytes = fig_combined.to_image(format="png", scale=2)
+        img_buf   = io.BytesIO(img_bytes)
+        story.append(RLImage(img_buf, width=6.5*inch, height=3*inch))
+    except Exception:
+        story.append(Paragraph("(Chart not available)", styles["Normal"]))
+
     story.append(Spacer(1, 20))
     story.append(Paragraph("Individual Stock Details", styles["Heading2"]))
 
@@ -166,7 +189,8 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
 
     for tk, td in ticker_data.items():
         info  = td["info"]
-        close = td["hist"]["Close"]
+        hist  = td["hist"]
+        close = hist["Close"]
         ma20  = close.rolling(20).mean()
         ma50  = close.rolling(50).mean()
         std20 = close.rolling(20).std()
@@ -186,8 +210,7 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
              "Low",           fmt(info.get("dayLow","N/A"))],
             ["Bid",           fmt(info.get("bid","N/A")),
              "Ask",           fmt(info.get("ask","N/A"))],
-            ["Market Cap",    f"${info.get('marketCap',0):,.0f}" if info.get("marketCap") else "N/A",
-             "",""],
+            ["Market Cap",    f"${info.get('marketCap',0):,.0f}" if info.get("marketCap") else "N/A", "",""],
             ["MA20",          fmt(ma20.iloc[-1]) if not pd.isna(ma20.iloc[-1]) else "N/A",
              "MA50",          fmt(ma50.iloc[-1]) if not pd.isna(ma50.iloc[-1]) else "N/A"],
             ["BB Upper",      fmt(bb_u) if not pd.isna(bb_u) else "N/A",
@@ -204,6 +227,41 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
             ("PADDING",       (0,0), (-1,-1), 5),
         ]))
         story.append(ptbl)
+        story.append(Spacer(1, 8))
+
+        # Individual candlestick chart
+        try:
+            fig_tk = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                                   row_heights=[0.75, 0.25], vertical_spacing=0.05)
+            fig_tk.add_trace(go.Candlestick(
+                x=hist.index, open=hist["Open"], high=hist["High"],
+                low=hist["Low"], close=hist["Close"], name="OHLC",
+                increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+            ), row=1, col=1)
+            fig_tk.add_trace(go.Scatter(x=hist.index, y=ma20, name="MA20",
+                             line=dict(color="#FFA726", width=1.5)), row=1, col=1)
+            fig_tk.add_trace(go.Scatter(x=hist.index, y=ma50, name="MA50",
+                             line=dict(color="#42A5F5", width=1.5)), row=1, col=1)
+            fig_tk.add_trace(go.Scatter(x=hist.index, y=ma20+2*std20, name="BB Upper",
+                             line=dict(color="#90CAF9", width=1, dash="dash")), row=1, col=1)
+            fig_tk.add_trace(go.Scatter(x=hist.index, y=ma20-2*std20, name="BB Lower",
+                             line=dict(color="#90CAF9", width=1, dash="dash")), row=1, col=1)
+            bar_colors = ["#26a69a" if c >= o else "#ef5350"
+                          for c, o in zip(hist["Close"], hist["Open"])]
+            fig_tk.add_trace(go.Bar(x=hist.index, y=hist["Volume"],
+                             marker_color=bar_colors, showlegend=False), row=2, col=1)
+            fig_tk.update_layout(
+                height=350, width=650,
+                margin=dict(l=20, r=20, t=20, b=20),
+                paper_bgcolor="white", plot_bgcolor="white",
+                xaxis_rangeslider_visible=False,
+                legend=dict(orientation="h", font=dict(size=8)),
+            )
+            img_bytes = fig_tk.to_image(format="png", scale=2)
+            img_buf   = io.BytesIO(img_bytes)
+            story.append(RLImage(img_buf, width=6.5*inch, height=3.5*inch))
+        except Exception:
+            story.append(Paragraph("(Chart not available)", styles["Normal"]))
 
     story.append(Spacer(1, 20))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
@@ -513,7 +571,8 @@ if analyze and ticker_qty_list:
     pdf_buffer = generate_pdf_report(
         summary_rows, ticker_data, period_label,
         st.session_state.nickname,
-        session_name if session_name.strip() else "Analysis Report"
+        session_name if session_name.strip() else "Analysis Report",
+        all_close
     )
     filename = f"{session_name.strip() or 'report'}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
     st.download_button(
