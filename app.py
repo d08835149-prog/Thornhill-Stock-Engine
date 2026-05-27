@@ -74,7 +74,7 @@ TRANSLATIONS = {
     "no_key":            {"English": "🔑 Add FINNHUB_API_KEY to secrets.", "Français": "🔑 Ajoutez FINNHUB_API_KEY.", "فارسی": "🔑 کلید FINNHUB_API_KEY را اضافه کنید.", "中文": "🔑 请添加 FINNHUB_API_KEY。", "한국어": "🔑 FINNHUB_API_KEY를 secrets에 추가해주세요."},
     "enter_one":         {"English": "Please enter at least one ticker.", "Français": "Entrez au moins un titre.", "فارسی": "حداقل یک نماد وارد کنید.", "中文": "请至少输入一个股票代码。", "한국어": "최소 1개 이상의 티커를 입력해주세요."},
     "last_updated":      {"English": "Data as of",            "Français": "Données au",          "فارسی": "داده‌ها تا",            "中文": "数据更新于",    "한국어": "데이터 기준"},
-    "cache_note":        {"English": "refreshes every 10 min","Français": "actualisation 10 min","فارسی": "بروزرسانی هر ۱۰ دقیقه","中文": "每10分钟刷新",  "한국어": "10분마다 갱신"},
+    "cache_note":        {"English": "refreshes every 20 min","Français": "actualisation 20 min","فارسی": "بروزرسانی هر ۲۰ دقیقه","中文": "每20分钟刷新",  "한국어": "20분마다 갱신"},
     "info":              {"English": "👈 Enter a period and tickers on the left, then click Analyze.", "Français": "👈 Entrez une période et des titres, puis cliquez sur Analyser.", "فارسی": "👈 دوره و نماد را وارد کنید، سپس تحلیل را بزنید.", "中文": "👈 在左侧输入周期和代码，然后点击分析。", "한국어": "👈 왼쪽에서 기간과 종목을 입력하고 분석하기를 눌러주세요."},
     "login":             {"English": "🔐 Login",               "Français": "🔐 Connexion",        "فارسی": "🔐 ورود",               "中文": "🔐 登录",       "한국어": "🔐 로그인"},
     "signup":            {"English": "📝 Sign Up",             "Français": "📝 Inscription",      "فارسی": "📝 ثبت‌نام",            "中文": "📝 注册",       "한국어": "📝 회원가입"},
@@ -465,8 +465,10 @@ with st.sidebar:
 # ════════════════════════════════════════════════════════════
 # Cached Data Fetcher (10 min TTL)
 # ════════════════════════════════════════════════════════════
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=1200, show_spinner=False)
 def fetch_ticker_data(ticker: str, period: str):
+    import time
+    time.sleep(1)
     obj = yf.Ticker(ticker)
 
     # 짧은 기간은 분 단위 인터벌로 더 촘촘하게
