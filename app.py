@@ -465,13 +465,16 @@ with st.sidebar:
 # ════════════════════════════════════════════════════════════
 # Cached Data Fetcher (10 min TTL)
 # ════════════════════════════════════════════════════════════
+# 캐시된 마지막 데이터 저장용 (rate limit 걸렸을 때 fallback)
+if "last_ticker_cache" not in st.session_state:
+    st.session_state.last_ticker_cache = {}
+
 @st.cache_data(ttl=1200, show_spinner=False)
 def fetch_ticker_data(ticker: str, period: str):
     import time
     time.sleep(1)
     obj = yf.Ticker(ticker)
 
-    # 짧은 기간은 분 단위 인터벌로 더 촘촘하게
     INTERVAL_MAP = {
         "1d":  ("1d",  "5m"),
         "5d":  ("5d",  "15m"),
@@ -494,6 +497,24 @@ def fetch_ticker_data(ticker: str, period: str):
 
     return hist, obj.info
 
+def fetch_with_fallback(ticker: str, period: str):
+    cache_key = f"{ticker}_{period}"
+    try:
+        hist, info = fetch_ticker_data(ticker, period)
+        if hist is not None:
+            # 성공하면 세션에 백업 저장
+            st.session_state.last_ticker_cache[cache_key] = {
+                "hist": hist, "info": info,
+                "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+            }
+        return hist, info, False  # False = 캐시 아님
+    except Exception:
+        # rate limit 등 에러 → 마지막 캐시 데이터 반환
+        if cache_key in st.session_state.last_ticker_cache:
+            cached = st.session_state.last_ticker_cache[cache_key]
+            return cached["hist"], cached["info"], cached["cached_at"]  # 캐시된 시간 반환
+        return None, None, False
+
 # ════════════════════════════════════════════════════════════
 # Analysis
 # ════════════════════════════════════════════════════════════
@@ -508,10 +529,12 @@ if analyze and ticker_qty_list:
 
     with st.spinner(t("loading")):
         for tk in tickers_input:
-            hist, info = fetch_ticker_data(tk, period)
+            hist, info, cached_at = fetch_with_fallback(tk, period)
             if hist is not None:
                 all_close[tk]   = hist["Close"]
                 ticker_data[tk] = {"hist": hist, "info": info}
+                if cached_at:
+                    st.warning(f"⚠️ {tk}: rate limited — showing cached data from {cached_at}")
             else:
                 st.warning(f"⚠️ {t('no_data')} {tk}.")
 
