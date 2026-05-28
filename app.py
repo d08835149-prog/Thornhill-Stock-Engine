@@ -173,8 +173,8 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
                 mode="lines", name=tk, line=dict(width=2),
             ))
         fig_combined.update_layout(
-            height=300, width=650,
-            margin=dict(l=20, r=20, t=20, b=20),
+            height=300, width=700,
+            margin=dict(l=60, r=20, t=20, b=40),
             paper_bgcolor="white", plot_bgcolor="white",
             legend=dict(orientation="h"),
         )
@@ -253,8 +253,8 @@ def generate_pdf_report(summary_rows, ticker_data, period_label, nickname, sessi
             fig_tk.add_trace(go.Bar(x=hist.index, y=hist["Volume"],
                              marker_color=bar_colors, showlegend=False), row=2, col=1)
             fig_tk.update_layout(
-                height=350, width=650,
-                margin=dict(l=20, r=20, t=20, b=20),
+                height=350, width=700,
+                margin=dict(l=60, r=20, t=20, b=40),
                 paper_bgcolor="white", plot_bgcolor="white",
                 xaxis_rangeslider_visible=False,
                 legend=dict(orientation="h", font=dict(size=8)),
