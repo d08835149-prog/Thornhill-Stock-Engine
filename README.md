@@ -127,7 +127,7 @@ Add all secrets under **App Settings → Secrets** in the Streamlit Cloud dashbo
 
 - This app is for **analysis purposes only**
 - Actual mock trading is done via **MooMoo Trade**
-- Stock data refreshes every **10 minutes** to avoid API rate limits
+- Stock data refreshes every **20 minutes** to avoid API rate limits
 
 ---
 
