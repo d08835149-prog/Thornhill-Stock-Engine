@@ -660,7 +660,15 @@ if analyze and ticker_qty_list:
         bid           = info.get("bid", "N/A")
         ask           = info.get("ask", "N/A")
         mkt_cap       = info.get("marketCap", None)
-        mkt_cap_str   = f"${mkt_cap:,.0f}" if mkt_cap else "N/A"
+
+        def fmt_mkt_cap(v):
+            if not v: return "N/A"
+            if v >= 1e12: return f"${v/1e12:.2f}T"
+            if v >= 1e9:  return f"${v/1e9:.2f}B"
+            if v >= 1e6:  return f"${v/1e6:.2f}M"
+            return f"${v:,.0f}"
+
+        mkt_cap_str = fmt_mkt_cap(mkt_cap)
 
         start_price = close.iloc[0]
         ret_pct     = (current_price - start_price) / start_price * 100
